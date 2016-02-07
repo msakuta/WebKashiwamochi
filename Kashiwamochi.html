@@ -15,6 +15,10 @@
 				margin: 0px;
 			}
 
+			#container{
+				position: relative;
+			}
+
 			#points{
 				font-size: 25px;
 			}
@@ -33,7 +37,7 @@
 			<option>11</option>
 			<option>12</option>
 		</select>
-		<input type="button" onclick="generateBoard()" value="Create">
+		<input type="button" onclick="generateBoard()" value="Start">
 		<hr>
 		<div id="container"></div>
 		<div id="points"></div>
@@ -77,6 +81,12 @@
 		var practiceMode = false;
 		var highscores = [];
 		var newscore = -1;
+
+		var gaugeElem;
+		var gaugeIntElem;
+		var subGaugeElem;
+		var subGaugeIntElem;
+		var gameOverElem;
 
 		var points = 0;             // score points
 		var chain = 0;              // chain count
@@ -247,6 +257,61 @@
 				table.appendChild(scoreTextElems[i]);
 			}
 
+			var containerRect = container.getBoundingClientRect();
+			var tableRect = table.getBoundingClientRect();
+
+			// Main gauge bar
+			gaugeElem = document.createElement('div');
+			gaugeElem.style.position = 'absolute';
+			gaugeElem.style.left = (tableRect.left - 50) + 'px';
+			gaugeElem.style.top = '0px';
+			gaugeElem.style.width = '20px';
+			gaugeElem.style.height = tableRect.height + 'px';
+			gaugeElem.style.backgroundColor = '#00003f';
+			container.appendChild(gaugeElem);
+
+			gaugeIntElem = document.createElement('div');
+			gaugeIntElem.style.position = 'relative';
+			gaugeIntElem.style.top = '0px';
+			gaugeIntElem.style.width = '20px';
+			gaugeIntElem.style.height = (tableRect.height) + 'px';
+			gaugeIntElem.style.backgroundColor = '#0000ff';
+			gaugeElem.appendChild(gaugeIntElem);
+
+			// Sub gauge bar
+			subGaugeElem = document.createElement('div');
+			subGaugeElem.style.position = 'absolute';
+			subGaugeElem.style.left = (tableRect.left - 20) + 'px';
+			subGaugeElem.style.top = '0px';
+			subGaugeElem.style.width = '10px';
+			subGaugeElem.style.height = tableRect.height + 'px';
+			subGaugeElem.style.backgroundColor = '#003f3f';
+			container.appendChild(subGaugeElem);
+
+			subGaugeIntElem = document.createElement('div');
+			subGaugeIntElem.style.position = 'relative';
+			subGaugeIntElem.style.top = '0px';
+			subGaugeIntElem.style.width = '10px';
+			subGaugeIntElem.style.height = (tableRect.height) + 'px';
+			subGaugeIntElem.style.backgroundColor = '#00ffff';
+			subGaugeElem.appendChild(subGaugeIntElem);
+
+			// Game over text overlay
+			gameOverElem = document.createElement('div');
+			gameOverElem.innerHTML = 'GAME OVER';
+			gameOverElem.style.position = 'absolute';
+			gameOverElem.style.fontFamily = 'Sans-serif';
+			gameOverElem.style.fontSize = '40px';
+			gameOverElem.style.fontWeight = 'bold';
+			gameOverElem.style.color = '#ff00ff';
+			gameOverElem.style.pointerEvents = 'none';
+			gameOverElem.style.textShadow = '0px 0px 3px #000000';
+			container.appendChild(gameOverElem);
+			var rect = gameOverElem.getBoundingClientRect();
+			gameOverElem.style.display = 'none';
+			gameOverElem.style.top = (tableRect.height / 2 - rect.height / 2) + 'px';
+			gameOverElem.style.marginLeft = (-rect.width / 2) + 'px';
+
 			debugText = document.createElement('div');
 			container.appendChild(debugText);
 		}
@@ -279,6 +344,12 @@
 			var pointsElem = document.getElementById("points");
 			if(pointsElem)
 				pointsElem.innerHTML = 'Points: ' + points;
+
+			var rect = gaugeElem.getBoundingClientRect();
+			gaugeIntElem.style.top = (rect.height * (1. - maingauge)) + 'px';
+			gaugeIntElem.style.height = (rect.height * maingauge) + 'px';
+			subGaugeIntElem.style.top = (rect.height * (1. - subgauge)) + 'px';
+			subGaugeIntElem.style.height = (rect.height * subgauge) + 'px';
 		}
 
 		function selectCell(sel){
@@ -306,6 +377,15 @@
 			var sizeStr = document.getElementById("sizeSelect").value;
 			size = parseInt(sizeStr);
 			board = new Array(size * size);
+
+			gameover = false;
+			points = 0;
+			chain = 0;
+			level = 0;
+			erases = 0;
+			maingauge = 0.3;
+			subgauge = 1.;
+//			practiceMode = e.getButton() != e.BUTTON1;
 
 			for(var i = 0; i < size * size; i++)
 				board[i] = newblock();
@@ -481,6 +561,7 @@
 					}
 				}
 			}
+			gameOverElem.style.display = 'inline';
 		}
 
 		function run() {
@@ -489,7 +570,7 @@
 				check();
 
 				var speed = fallTime !== 0 || eraseEffectTime !== 0 ? 0 : (level + 1) * (level % 6 == 5 ? 0.2 : 1) * 0.005;
-/*				if(subgauge < speed){
+				if(subgauge < speed){
 					speed -= subgauge;
 					subgauge = 0;
 					speed *= 0.25;
@@ -503,7 +584,7 @@
 						maingauge -= speed;
 				}
 				else
-					subgauge -= speed;*/
+					subgauge -= speed;
 
 				if(eraseEffectTime !== 0 && --eraseEffectTime === 0){
 					for(var i = 0; i < size * size; i++){
