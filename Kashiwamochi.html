@@ -15,6 +15,10 @@
 				margin: 0px;
 			}
 
+			#points{
+				font-size: 25px;
+			}
+
 		</style>
 	</head>
 	<body>
@@ -32,6 +36,7 @@
 		<input type="button" onclick="generateBoard()" value="Create">
 		<hr>
 		<div id="container"></div>
+		<div id="points"></div>
 
 		<script>
 		var container;
@@ -83,7 +88,10 @@
 		var fallTime = 0;
 
 
-		var scoreTexts = [0,0,0,0]; // r, c, point, life
+		var scoreTexts = new Array(maxScoreTexts * 4); // r, c, point, life
+		for(var i = 0; i < scoreTexts.length; i++)
+			scoreTexts[i] = 0;
+		var scoreTextElems = [];
 
 		function iterateCells(func){
 			for(var iy = 0; iy < size; iy++){
@@ -221,6 +229,24 @@
 			// Set the margin after contents are initialized
 			table.style.marginLeft = (-table.getBoundingClientRect().width / 2) + 'px';
 
+			// Create elements for popup score texts, but hide them until needed.
+			for(var i = 0; i < maxScoreTexts; i++){
+				scoreTextElems[i] = document.createElement('div');
+				scoreTextElems[i].style.position = 'absolute';
+				scoreTextElems[i].style.display = 'none';
+				scoreTextElems[i].style.fontFamily = 'Monospace';
+				scoreTextElems[i].style.fontSize = '35px';
+				scoreTextElems[i].style.color = '#ff0000';
+				scoreTextElems[i].style.textShadow = '1px 1px 2px #000000';
+
+				// Prevent context menu from right clicking on the text
+				scoreTextElems[i].oncontextmenu = function(e){
+					e.preventDefault();
+				};
+
+				table.appendChild(scoreTextElems[i]);
+			}
+
 			debugText = document.createElement('div');
 			container.appendChild(debugText);
 		}
@@ -233,6 +259,26 @@
 					cell.children[1].style.display = board[ix + iy * size] & eraseEffectBit ? 'inline' : 'none';
 				}
 			}
+
+			// Popup scores
+			for(i = 0; i < maxScoreTexts; i++){
+				if(scoreTexts[i * 4 + 3] !== 0){
+					var x = scoreTexts[i * 4 + 1];
+					scoreTextElems[i].style.left = (x < 0 ? 0 : x) + 'px';
+					var y = scoreTexts[i * 4 + 0] + scoreTexts[i * 4 + 3];
+					scoreTextElems[i].style.top = (y < 20 ? 20 : y) + 'px';
+					scoreTextElems[i].style.display = 'block';
+					scoreTextElems[i].innerHTML = scoreTexts[i * 4 + 2];
+				}
+				else {
+					scoreTextElems[i].style.display = 'none';
+				}
+			}
+
+			// Update current score text
+			var pointsElem = document.getElementById("points");
+			if(pointsElem)
+				pointsElem.innerHTML = 'Points: ' + points;
 		}
 
 		function selectCell(sel){
@@ -410,7 +456,7 @@
 				eraseFrame = 1;
 				chain++;
 			}
-			for(var i = 0; i < maxScoreTexts; i++) if(scoreTexts[i * 4 + 3] == 0){
+			for(var i = 0; i < maxScoreTexts; i++) if(scoreTexts[i * 4 + 3] === 0){
 				scoreTexts[i * 4 + 0] = r + 20;
 				scoreTexts[i * 4 + 1] = c - 15;
 				scoreTexts[i * 4 + 2] = point;
@@ -482,7 +528,7 @@
 				if((level + 1) * 25 <= erases)
 					level++;
 				for(var i = 0; i < maxScoreTexts; i++){
-					if(scoreTexts[i * 4 + 3] != 0){
+					if(scoreTexts[i * 4 + 3] !== 0){
 						scoreTexts[i * 4 + 3]--;
 					}
 				}
