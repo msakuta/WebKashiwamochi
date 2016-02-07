@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>WebKashiwamochi</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<style>
+			body {
+				color: #000000;
+				font-family:Monospace;
+				font-size:15px;
+				text-align:center;
+
+				background-color: #f0f0f0;
+				margin: 0px;
+			}
+
+		</style>
+	</head>
+	<body>
+		<h1>WebKashiwamochi</h1>
+		Size:
+		<select id="sizeSelect">
+			<option>3</option>
+			<option>4</option>
+			<option>5</option>
+			<option selected>6</option>
+			<option>7</option>
+			<option>8</option>
+			<option>9</option>
+		</select>
+		<input type="button" onclick="generateBoard()" value="Create">
+		<hr>
+		<div id="container"></div>
+
+		<script>
+		var container;
+		var table;
+		var size;
+		var board;
+		var cellElems;
+		var selectedCell = null;
+		var selectedCoords = null;
+		var cursorElem;
+		var messageElem;
+		var debugText;
+
+		function iterateCells(func){
+			for(var iy = 0; iy < size; iy++){
+				for(var ix = 0; ix < size; ix++){
+					func(ix, iy);
+				}
+			}
+		}
+
+		window.onload = function(){
+			generateBoard();
+		}
+
+		function createElements(){
+			var cellImages = [
+				'images/a.gif',
+				'images/b.gif',
+				'images/c.gif',
+				'images/d.gif',
+			]
+			cellElems = new Array(size * size);
+			operElems = new Array(size * size);
+
+			// The containers are nested so that the inner container can be easily
+			// discarded to recreate the whole game.
+			var outerContainer = document.getElementById("container");
+			if(container)
+				outerContainer.removeChild(container);
+			container = document.createElement("div");
+			outerContainer.appendChild(container);
+			if(cursorElem)
+				cursorElem = null;
+
+			table = document.createElement("div");
+			table.style.borderStyle = 'solid';
+			table.style.borderWidth = '1px';
+			table.style.borderColor = 'red';
+			table.style.position = 'relative';
+			table.style.left = '50%';
+			table.style.width = (size * 32. + 8) + 'px';
+			table.style.height = (size * 32. + 8) + 'px';
+
+			messageElem = document.createElement('div');
+			container.appendChild(messageElem);
+			messageElem.style.fontFamily = 'Sans-serif';
+			messageElem.style.fontSize = '20pt';
+			messageElem.style.position = 'relative';
+			messageElem.style.color = 'red';
+
+			container.appendChild(table);
+			for(var iy = 0; iy < size; iy++){
+				for(var ix = 0; ix < size; ix++){
+					var cell = document.createElement("div");
+					cellElems[ix + iy * size] = cell;
+					cell.innerHTML = "";
+					//cell.style.backgroundColor = colors[region[ix + iy * size] % 4];
+					cell.style.width = '31px';
+					cell.style.height = '31px';
+					cell.style.position = 'absolute';
+					cell.style.top = (32.0 * iy + 4) + 'px';
+					cell.style.left = (32.0 * ix + 4) + 'px';
+					cell.style.verticalAlign = 'middle';
+					cell.style.border = '1px black solid';
+					cell.onclick = function(){
+						selectCell(this);
+					}
+					cell.onmousemove = function(){
+						selectCell(this);
+					}
+					table.appendChild(cell);
+
+					var img = document.createElement('img');
+					img.src = cellImages[board[ix + iy * size]];
+					cell.appendChild(img);
+
+				}
+			}
+			// Set the margin after contents are initialized
+			table.style.marginLeft = (-table.getBoundingClientRect().width / 2) + 'px';
+
+			debugText = document.createElement('div');
+			container.appendChild(debugText);
+		}
+
+		function selectCell(sel){
+			selectedCell = sel;
+			var idx = cellElems.indexOf(sel);
+			var ix = idx % size;
+			var iy = Math.floor(idx / size);
+			selectedCoords = [ix, iy];
+			if(ix < size-1 && iy < size-1){
+				if(!cursorElem){
+					cursorElem = document.createElement('div');
+					cursorElem.style.border = '2px blue solid';
+					cursorElem.style.pointerEvents = 'none';
+					table.appendChild(cursorElem);
+				}
+				cursorElem.style.position = 'absolute';
+				cursorElem.style.top = (32.0 * iy + 4) + 'px';
+				cursorElem.style.left = (32.0 * ix + 4) + 'px';
+				cursorElem.style.width = '62px';
+				cursorElem.style.height = '62px';
+			}
+		}
+
+		function generateBoard(){
+			var sizeStr = document.getElementById("sizeSelect").value;
+			size = parseInt(sizeStr);
+			board = new Array(size * size);
+
+			for(var i = 0; i < size * size; i++)
+				board[i] = Math.floor(Math.random() * 4);
+
+			createElements();
+		}
+
+		</script>
+
+	</body>
+</html>
