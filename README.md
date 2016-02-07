@@ -16,6 +16,14 @@ Left rotates counterclockwise, while right rotates clockwise.
 If four cells in a row have the same type of image as a result of rotation,
 those four cells are erased and cells above them fall down to fill the vacancy.
 
+
+High Scores
+-----------
+
+High scores are stored in your browser's local storage, so if you switch the
+browser, you won't see the same high scores.
+
+
 History
 -------
 

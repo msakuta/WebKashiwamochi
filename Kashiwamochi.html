@@ -23,6 +23,17 @@
 				font-size: 25px;
 			}
 
+			table{
+				background-color: #f7c0a0;
+				border: 3px solid #7f7f7f;
+				border-collapse: collapse;
+				/* Centering */
+				margin-left: auto;
+				margin-right: auto;
+			}
+			td{background-color: #ffe0d0}
+			th{background-color: #e0c0a0}
+			td, th{padding: 2px; border: 2px solid #7f7f7f}
 		</style>
 	</head>
 	<body>
@@ -41,6 +52,10 @@
 		<hr>
 		<div id="container"></div>
 		<div id="points"></div>
+		<hr>
+		<div id="highScores"></div>
+		<hr>
+		<div>Source on <a href="https://github.com/msakuta/WebKashiwamochi">GitHub</a>.
 
 		<script>
 		var container;
@@ -79,7 +94,7 @@
 		var subgauge = 0;
 		var gameover = false;
 		var practiceMode = false;
-		var highscores = [];
+		var sizeHighScores = {};
 		var newscore = -1;
 
 		var gaugeElem;
@@ -112,6 +127,22 @@
 		}
 
 		window.onload = function(){
+
+			// Load from the local storage before updating the table
+			if(typeof(Storage) !== "undefined"){
+				try{
+					deserialize(localStorage.getItem("Kashiwamochi"));
+				}
+				catch(e){
+					// If something got wrong about the storage, clear everything.
+					// Doing so would guarantee the problem no longer persists, or we
+					// would be caught in the same problem repeatedly.
+					sizeHighScores = {};
+					localStorage.removeItem("Kashiwamochi");
+				}
+				updateHighScores();
+			}
+
 			generateBoard();
 			window.setInterval(function(){
 				run();
@@ -391,6 +422,8 @@
 				board[i] = newblock();
 
 			createElements();
+
+			updateHighScores();
 		}
 
 		function newblock(){
@@ -551,17 +584,78 @@
 			gameover = true;
 			newscore = -1;
 			if(!practiceMode){
-				for(var i = 0; i < highscores.length; i++){
-					if(highscores[i] < points){
-						for(var j = highscores.length - 1; i < j; j--)
-							highscores[j] = highscores[j-1];
-						highscores[i] = points;
-						newscore = i;
+				if(!sizeHighScores[size])
+					sizeHighScores[size] = [];
+				var highScores = sizeHighScores[size];
+
+				// Update the high scores
+				var insertionIdx = highScores.length;
+				for(var j = 0; j < highScores.length; j++){
+					if(highScores[j].score < points){
+						insertionIdx = j;
 						break;
 					}
 				}
+				highScores.splice(insertionIdx, 0, {score: points, date: new Date()});
+				// Limit the number of high scores
+				if(20 < highScores.length)
+					highScores.pop();
+
+				if(typeof(Storage) !== "undefined"){
+					localStorage.setItem("Kashiwamochi", serialize());
+				}
+				updateHighScores();
 			}
 			gameOverElem.style.display = 'inline';
+		}
+
+		/// Update current high score ranking to the table.
+		function updateHighScores(){
+			var elem = document.getElementById("highScores");
+
+			var highScores = sizeHighScores[size];
+			if(!highScores || highScores.length === 0){
+				// Clear the table if no high scores are available
+				elem.innerHTML = "";
+				return;
+			}
+			// Table and its child nodes could be elements created by document.createElement(),
+			// but this string concatenation is far simpler.
+			var table = "High Scores for size " + size + ":<table><tr><th>Place</th><th>Date</th><th>Score</th></tr>";
+			for(var i = 0; i < highScores.length; i++){
+				table += "<tr><td>" + (i+1) + "</td><td>" + highScores[i].date.toLocaleString() + "</td><td>" + highScores[i].score + "</td></tr>";
+			}
+			table += "</table>";
+			elem.innerHTML = table;
+		}
+
+		function deserialize(stream){
+			var data = JSON.parse(stream);
+			if(data !== null){
+				sizeHighScores = {};
+				for(var key in data.highScores){
+					var jsonHighScores = data.highScores[key];
+					if(!jsonHighScores)
+						continue;
+					var highScores = [];
+					for(var i = 0; i < jsonHighScores.length; i++)
+						highScores.push({score: jsonHighScores[i].score, date: new Date(jsonHighScores[i].date)});
+					sizeHighScores[key] = highScores;
+				}
+			}
+		}
+
+		function serialize(){
+			var jsonSizeHighScores = {};
+			for(var key in sizeHighScores) {
+				var highScores = sizeHighScores[key];
+				var jsonHighScores = [];
+				for(var i = 0; i < highScores.length; i++)
+					jsonHighScores.push({score: highScores[i].score, date: highScores[i].date.toJSON()});
+				jsonSizeHighScores[key] = jsonHighScores;
+			}
+			var saveData = {highScores: jsonSizeHighScores};
+			return JSON.stringify(saveData);
 		}
 
 		function run() {
