@@ -21,13 +21,13 @@
 		<h1>WebKashiwamochi</h1>
 		Size:
 		<select id="sizeSelect">
-			<option>3</option>
-			<option>4</option>
-			<option>5</option>
-			<option selected>6</option>
-			<option>7</option>
+			<option>6</option>
+			<option selected>7</option>
 			<option>8</option>
 			<option>9</option>
+			<option>10</option>
+			<option>11</option>
+			<option>12</option>
 		</select>
 		<input type="button" onclick="generateBoard()" value="Create">
 		<hr>
@@ -45,6 +45,46 @@
 		var messageElem;
 		var debugText;
 
+		// Constants
+		var eraseEffectBit = 0x100;
+		var fallEffectBit = 0x200;
+		var fallMaxTime = 3;
+		var rollMaxTime = 3;
+		var maxScoreTexts = 4;
+		var gaugeHeight = 128;
+		var cellsize = 32;
+		var cellImages = [
+			'',
+			'images/block.png',
+			'images/a.gif',
+			'images/b.gif',
+			'images/c.gif',
+			'images/d.gif',
+			'images/e.gif',
+		];
+
+		var rollx, rolly = -1;
+		var rollTime = 0;
+		var rollDirection = 0;
+		var maingauge = 0;
+		var subgauge = 0;
+		var gameover = false;
+		var practiceMode = false;
+		var highscores = [];
+		var newscore = -1;
+
+		var points = 0;             // score points
+		var chain = 0;              // chain count
+		var movement = 0;           // internal variable to count chains
+		var level = 0;              // game level
+		var erases = 0;             // internal variable to control level
+		var eraseEffectTime = 0;
+		var mouseTime = 0;
+		var fallTime = 0;
+
+
+		var scoreTexts = [0,0,0,0]; // r, c, point, life
+
 		function iterateCells(func){
 			for(var iy = 0; iy < size; iy++){
 				for(var ix = 0; ix < size; ix++){
@@ -55,17 +95,13 @@
 
 		window.onload = function(){
 			generateBoard();
+			window.setInterval(function(){
+				run();
+			}, 50);
 		}
 
 		function createElements(){
-			var cellImages = [
-				'images/a.gif',
-				'images/b.gif',
-				'images/c.gif',
-				'images/d.gif',
-			]
 			cellElems = new Array(size * size);
-			operElems = new Array(size * size);
 
 			// The containers are nested so that the inner container can be easily
 			// discarded to recreate the whole game.
@@ -105,8 +141,8 @@
 					cell.style.position = 'absolute';
 					cell.style.top = (32.0 * iy + 4) + 'px';
 					cell.style.left = (32.0 * ix + 4) + 'px';
-					cell.style.verticalAlign = 'middle';
 					cell.style.border = '1px black solid';
+					cell.style.textAlign = 'left';
 					cell.onmousedown = function(e){
 						var idx = cellElems.indexOf(this);
 						var c = idx % size;
@@ -157,6 +193,7 @@
 							}
 							rollDirection = 1;
 						}
+						check();
 						createElements();
 						return false;
 					}
@@ -172,9 +209,15 @@
 					table.appendChild(cell);
 
 					var img = document.createElement('img');
-					img.src = cellImages[board[ix + iy * size]];
+					img.src = cellImages[board[ix + iy * size] & ~(eraseEffectBit | fallEffectBit)];
 					cell.appendChild(img);
-
+					var eraseEffect = document.createElement('img');
+					eraseEffect.src = 'images/light.png';
+					eraseEffect.style.position = 'absolute';
+					eraseEffect.style.left = '0px';
+					eraseEffect.style.top = '0px';
+					eraseEffect.style.display = board[ix + iy * size] & eraseEffectBit ? 'inline' : 'none';
+					cell.appendChild(eraseEffect);
 				}
 			}
 			// Set the margin after contents are initialized
@@ -182,6 +225,16 @@
 
 			debugText = document.createElement('div');
 			container.appendChild(debugText);
+		}
+
+		function updateElements(){
+			for(var iy = 0; iy < size; iy++){
+				for(var ix = 0; ix < size; ix++){
+					var cell = cellElems[ix + iy * size];
+					cell.children[0].src = cellImages[board[ix + iy * size] & ~(eraseEffectBit | fallEffectBit)];
+					cell.children[1].style.display = board[ix + iy * size] & eraseEffectBit ? 'inline' : 'none';
+				}
+			}
 		}
 
 		function selectCell(sel){
@@ -211,9 +264,233 @@
 			board = new Array(size * size);
 
 			for(var i = 0; i < size * size; i++)
-				board[i] = Math.floor(Math.random() * 4);
+				board[i] = newblock();
 
 			createElements();
+		}
+
+		function newblock(){
+			return (Math.random() * 150) == 0 ? 1 : Math.floor(Math.random() * 5) + 2;
+		}
+
+		function fallCheck(){
+			if(eraseEffectTime == 0 && fallTime == 0 && rollTime == 0){
+				for(var r = size-1; 0 <= r; r--){
+					for(var c = 0; c < size; c++){
+						if(board[r * size + c] === 0 || (board[r * size + c] & fallEffectBit) !== 0){
+							board[r * size + c] = 0 < r ? board[(r - 1) * size + c] : newblock();
+							board[r * size + c] |= fallEffectBit;
+							if(0 < r)
+								board[(r - 1) * size + c] = 0;
+							fallTime = fallMaxTime;
+						}
+					}
+				}
+			}
+
+		}
+
+		function check(){
+
+			if(eraseEffectTime !== 0 || fallTime !== 0 || rollTime !== 0)
+				return;
+
+			eraseFrame = 0;
+
+			// horizontal
+			for(var r = 0; r < size; r++) for(var c = 0; c < size - 3; c++){
+				var n, i, cc = 1;
+				var src = board[r * size + c] & ~(eraseEffectBit);
+				if(src === 0 || src === 1)
+					continue;
+				for(i = 1; c + i < size; i++){
+					var target = board[r * size + (c + i)];
+					if((target & ~eraseEffectBit) != src)
+						break;
+					else if(0 === (target & eraseEffectBit))
+						cc++;
+				}
+				if(i < 4 || cc === 1)
+					continue;
+				for(var j = 0; j < i; j++)
+					board[r * size + (c + j)] |= eraseEffectBit;
+	/*			for(n = r; 0 <= n; n--) for(int j = 0; j < i; j++){
+					if(n != 0)
+						board[n * 7 + (c + j)] = board[(n - 1) * 7 + (c + j)] | (n == r ? eraseEffectBit : 0);
+					else
+						board[n * 7 + (c + j)] = newblock();
+					board[n * 7 + (c + j)] |= (n == r ? eraseEffectBit : 0);
+				}*/
+				scorePoint(cc, r * cellsize, c * cellsize + i * cellsize / 2);
+			}
+
+			// vertical
+			for(r = 0; r < size - 3; r++) for(c = 0; c < size; c++){
+				var n, i, cc = 1;
+				var src = board[r * size + c] & ~(eraseEffectBit);
+				if(src === 0 || src === 1)
+					continue;
+				for(i = 1; r + i < size; i++){
+					var target = board[(r + i) * size + c];
+					if((target & ~eraseEffectBit) != src)
+						break;
+					else if(0 === (target & eraseEffectBit))
+						cc++;
+				}
+				if(i < 4 || cc === 1)
+					continue;
+				for(var j = 0; j < i; j++)
+					board[(r + j) * size + c] |= eraseEffectBit;
+	/*			for(n = r + i - 1; 0 <= n; n--){
+					if(i < n)
+						board[n * 7 + c] = board[(n - i) * 7 + c];
+					else
+						board[n * 7 + c] = newblock();
+					board[n * 7 + c] |= (r <= n ? eraseEffectBit : 0);
+				}*/
+				scorePoint(cc, r * cellsize + i * cellsize / 2, c * cellsize);
+			}
+
+			// rightside-down diagonal
+			for(r = 0; r < size - 3; r++) for(c = 0; c < size - 3; c++){
+				var n, i, cc = 1;
+				var src = board[r * size + c] & ~(eraseEffectBit);
+				if(src === 0 || src === 1)
+					continue;
+				for(i = 1; c + i < size && r + i < size; i++){
+					var target = board[(r + i) * size + (c + i)];
+					if((target & ~eraseEffectBit) != src)
+						break;
+					else if(0 === (target & eraseEffectBit))
+						cc++;
+				}
+				if(i < 4 || cc === 1)
+					continue;
+				for(var j = 0; j < i; j++)
+					board[(r + j) * size + (c + j)] |= eraseEffectBit;
+	/*			for(int j = 0; j < i; j++) for(n = r + j; 0 <= n; n--) if(n != 0)
+					board[n * 7 + (c + j)] = board[(n - 1) * 7 + (c + j)] | (n == r + j ? eraseEffectBit : 0);
+				else
+					board[n * 7 + (c + j)] = newblock();*/
+				scorePoint(cc, r * cellsize + i * cellsize / 2, c * cellsize + i * cellsize / 2);
+			}
+
+			// rightside-up diagonal
+			for(c = 0; c < size - 3; c++) for(r = 3; r < size; r++){
+				var n, i, cc = 1;
+				var src = board[r * size + c] & ~(eraseEffectBit);
+				if(src === 0 || src === 1)
+					continue;
+				for(i = 1; c + i < size && 0 <= r - i; i++){
+					var target = board[(r - i) * size + (c + i)];
+					if((target & ~eraseEffectBit) != src)
+						break;
+					else if(0 === (target & eraseEffectBit))
+						cc++;
+				}
+				if(i < 4 || cc === 1)
+					continue;
+				for(var j = 0; j < i; j++)
+					board[(r - j) * size + (c + j)] |= eraseEffectBit;
+	/*			for(int j = 0; j < i; j++) for(n = r - j; 0 <= n; n--) if(n != 0)
+					board[n * 7 + (c + j)] = board[(n - 1) * 7 + (c + j)] | (n == r - j ? eraseEffectBit : 0);
+				else
+					board[n * 7 + (c + j)] = newblock();*/
+				scorePoint(cc, r * cellsize - i * cellsize / 2, c * cellsize + i * cellsize / 2);
+			}
+
+		}
+
+		function scorePoint(cc, r, c){
+			var point = (10 + (cc < 4 ? 0 : cc - 4) * 10) * (chain + 1) * (level + 1);
+			points += point;
+			movement = 0;
+			eraseEffectTime = 10;
+			if(1 <= chain)
+				maingauge = maingauge + 0.05 < 1 ? maingauge + .05 : 1;
+			if(eraseFrame == 0){
+				eraseFrame = 1;
+				chain++;
+			}
+			for(var i = 0; i < maxScoreTexts; i++) if(scoreTexts[i * 4 + 3] == 0){
+				scoreTexts[i * 4 + 0] = r + 20;
+				scoreTexts[i * 4 + 1] = c - 15;
+				scoreTexts[i * 4 + 2] = point;
+				scoreTexts[i * 4 + 3] = 20;
+				break;
+			}
+			erases += cc;
+			subgauge = 1;
+		}
+
+		function becomeGameover(){
+			gameover = true;
+			newscore = -1;
+			if(!practiceMode){
+				for(var i = 0; i < highscores.length; i++){
+					if(highscores[i] < points){
+						for(var j = highscores.length - 1; i < j; j--)
+							highscores[j] = highscores[j-1];
+						highscores[i] = points;
+						newscore = i;
+						break;
+					}
+				}
+			}
+		}
+
+		function run() {
+			if(!gameover){
+				fallCheck();		// fall flag check precedes
+				check();
+
+				var speed = fallTime !== 0 || eraseEffectTime !== 0 ? 0 : (level + 1) * (level % 6 == 5 ? 0.2 : 1) * 0.005;
+/*				if(subgauge < speed){
+					speed -= subgauge;
+					subgauge = 0;
+					speed *= 0.25;
+					if(maingauge < speed){
+						if(practiceMode)
+							maingauge = 0;
+						else
+							becomeGameover();
+					}
+					else
+						maingauge -= speed;
+				}
+				else
+					subgauge -= speed;*/
+
+				if(eraseEffectTime !== 0 && --eraseEffectTime === 0){
+					for(var i = 0; i < size * size; i++){
+						if((board[i] & eraseEffectBit) != 0){
+							board[i] = 0 /*&= ~eraseEffectBit*/;
+						}
+					}
+				}
+				if(fallTime !== 0 && --fallTime === 0){
+					for(var r = size; 0 <= r; r--){
+						for(var c = 0; c < size; c++){
+							if((board[r * size + c] & fallEffectBit) !== 0){
+								board[r * size + c] &= ~fallEffectBit;
+							}
+						}
+					}
+				}
+				if(rollTime !== 0 && --rollTime === 0)
+					check();
+				if(mouseTime !== 0)
+					mouseTime--;
+				if((level + 1) * 25 <= erases)
+					level++;
+				for(var i = 0; i < maxScoreTexts; i++){
+					if(scoreTexts[i * 4 + 3] != 0){
+						scoreTexts[i * 4 + 3]--;
+					}
+				}
+
+				updateElements();
+			}
 		}
 
 		</script>
