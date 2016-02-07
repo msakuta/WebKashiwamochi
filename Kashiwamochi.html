@@ -107,9 +107,65 @@
 					cell.style.left = (32.0 * ix + 4) + 'px';
 					cell.style.verticalAlign = 'middle';
 					cell.style.border = '1px black solid';
-					cell.onclick = function(){
-						selectCell(this);
+					cell.onmousedown = function(e){
+						var idx = cellElems.indexOf(this);
+						var c = idx % size;
+						var r = Math.floor(idx / size);
+
+						// Rotate the blocks counterclockwise
+						if(e.button === 0){
+							var f = 0, d = 0;
+							var a = board[r * size + c];
+							var b = board[r * size + c + 1];
+							if(r !== size - 1){
+								f = board[(r + 1) * size + c + 1];
+								d = board[(r + 1) * size + c];
+							}
+			/*				else for(int n = r; 0 <= n; n--){
+								board[n * 7 + c + 1] = (0 < n ? board[(n - 1) * 7 + c + 1] : newblock());
+							}*/
+							board[r * size + c] = b;
+							if(r !== size - 1){
+								board[r * size + c + 1] = f;
+								board[(r + 1) * size + c + 1] = d;
+								board[(r + 1) * size + c] = a;
+							}
+							else{
+								board[r * size + c + 1] = 0;
+							}
+							rollDirection = 0;
+						}
+						else{// Rotate the blocks clockwise
+							var f = 0, d = 0;
+							var a = board[r * size + c];
+							var b = board[r * size + c + 1];
+							if(r !== size - 1){
+								f = board[(r + 1) * size + c + 1];
+								d = board[(r + 1) * size + c];
+							}
+			/*				else for(int n = r; 0 <= n; n--){
+								board[n * 7 + c] = (0 < n ? board[(n - 1) * 7 + c] : newblock());
+							}*/
+							board[r * size + c + 1] = a;
+							if(r !== size - 1){
+								board[r * size + c] = d;
+								board[(r + 1) * size + c + 1] = b;
+								board[(r + 1) * size + c] = f;
+							}
+							else{
+								board[r * size + c] = 0;
+							}
+							rollDirection = 1;
+						}
+						createElements();
+						return false;
 					}
+
+					// Prevent context menu from right clicking on the cell
+					cell.oncontextmenu = function(e){
+						e.preventDefault();
+					}
+
 					cell.onmousemove = function(){
 						selectCell(this);
 					}
