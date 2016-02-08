@@ -199,6 +199,11 @@
 						var c = idx % size;
 						var r = Math.floor(idx / size);
 
+						// If the player clicked on the last row or column,
+						// ignore it because you cannot rotate beyond border.
+						if(size - 1 <= c || size - 1 <= r)
+							return;
+
 						// Rotate the blocks counterclockwise
 						if(e.button === 0){
 							var f = 0, d = 0;
